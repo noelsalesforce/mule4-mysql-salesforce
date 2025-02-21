@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<types:mule xmlns:types="http://www.mulesoft.org/schema/mule/types">
+  <types:catalog>
+    <types:type name="patient" format="json">
+      <types:shape format="weave" example="examples/db-patient.json"><![CDATA[%dw 2.0
+
+type patient = {|
+  patient: {|
+    id: Number {"typeId": "int"}, 
+    firstName: String, 
+    lastName: String, 
+    email: String, 
+    dateOfBirth: String, 
+    streetAddress: String, 
+    city: String, 
+    state: String, 
+    zipCode: String, 
+    country: String, 
+    region: String, 
+    phone: String, 
+    postalCode: String
+  |}
+|} {"example": "{\\\"patient\\\":{\\\"id\\\":1,\\\"firstName\\\":\\\"Keven\\\",\\\"lastName\\\":\\\"Torphy\\\",\\\"email\\\":\\\"xsimonis@example.org\\\",\\\"dateOfBirth\\\":\\\"1984-12-21\\\",\\\"streetAddress\\\":\\\"9325 Jaskolski Locks Apt. 868\\\",\\\"city\\\":\\\"Rosettaton\\\",\\\"state\\\":\\\"Michigan\\\",\\\"zipCode\\\":\\\"90126-1596\\\",\\\"country\\\":\\\"USA\\\",\\\"region\\\":\\\"East Rene\\\",\\\"phone\\\":\\\"(810)762-2085\\\",\\\"postalCode\\\":\\\"05669-1697\\\"}}"}
+
+]]></types:shape>
+    </types:type>
+  </types:catalog>
+  <types:enrichment select="#d9721b70-75fe-45a7-aea6-aa0ca238f2c8">
+    <types:processor-declaration>
+      <types:output-event>
+        <types:message>
+          <types:payload type="patient"/>
+        </types:message>
+      </types:output-event>
+    </types:processor-declaration>
+  </types:enrichment>
+</types:mule>

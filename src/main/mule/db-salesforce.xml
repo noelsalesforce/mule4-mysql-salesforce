@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce-pub-sub="http://www.mulesoft.org/schema/mule/salesforce-pub-sub"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/salesforce-pub-sub http://www.mulesoft.org/schema/mule/salesforce-pub-sub/current/mule-salesforce-pub-sub.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="b6da9dd4-ba5c-455b-830d-bc5fd8bbad7e" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="c88abb75-e824-4b28-96cc-202b3e3732df" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${db.user}" password="${db.password}" database="${db.database}"/>
+	</db:config>
+	<configuration-properties doc:name="Configuration properties" doc:id="9b28f688-4e4b-45fb-880f-24a154c0955a" file="credentials.properties" />
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="9f1f5693-7b27-4ed8-9dcb-ab349deb829f" >
+		<salesforce:basic-connection username="${sfdc.username}" password="${sfdc.password}" />
+	</salesforce:sfdc-config>
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="eb0d5d5d-74b3-41de-a48a-fec616088d50" />
+	<flow name="Flow1-BulkCreate" doc:id="0f109990-ae31-43ec-9111-3b1e8027b2c2" >
+		<http:listener doc:name="/createPatients" doc:id="a793e131-2d8f-4417-8cd1-ec6dcc2e34ee" config-ref="HTTP_Listener_config" path="/createPatients"/>
+		<db:select doc:name="All Patients from MySQL DB" doc:id="5d39db21-e1bb-4d7a-b9fb-09ac00b531aa" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM patients]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="894fa768-e245-4c65-9f73-5072876c19e3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	Patient_ID__c: payload01.id as String,
+	Date_of_Birth__c: payload01.birthdate,
+	First_Name__c: payload01.first_name,
+	Last_Name__c: payload01.last_name,
+	Street_Address__c: payload01.address as String,
+	City__c: payload01.city,
+	State__c: payload01.state,
+	Zip_Code__c: payload01.postal_code,
+	Phone__c: payload01.phone,
+	Email__c: payload01.email
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="New Patient Opportunities" doc:id="fd6e82c0-365b-4574-a911-81fc80129ec9" config-ref="Salesforce_Config" type="Patient_Opportunity__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="6060d3f1-9570-4c41-a06d-325b86262b27" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "All patients successfully created"
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="Flow1-BulkDelete" doc:id="fcbd4056-0e4d-4626-a4ba-f59b9079d7b1">
+		<http:listener doc:name="/deletePatients" doc:id="a9e0d46a-b691-4a17-9374-a8b81603c785" config-ref="HTTP_Listener_config" path="/deletePatients" />
+		<salesforce:query-all doc:name="Query all" doc:id="353fc8ae-9eca-43ad-86a8-8de273e0bad5" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query><![CDATA[SELECT id from Patient_Opportunity__c WHERE IsDeleted = FALSE
+]]></salesforce:salesforce-query>
+		</salesforce:query-all>
+		<ee:transform doc:name="Transform Message" doc:id="00229c71-6675-4f67-89e6-27da57229540">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload.Id]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:delete doc:name="Delete" doc:id="d9fe8462-dae6-4e7a-9f18-02609921a9a1" config-ref="Salesforce_Config" />
+		<ee:transform doc:name="Transform Message" doc:id="f36b37d3-8438-4317-b51f-35949dfe0d13">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "All patients deleted"
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="Flow2-UpdatePatientInformation" doc:id="d6899694-9d35-4c05-9747-31bc75840a18">
+		<salesforce:modified-object-listener doc:name="On Modified Object" doc:id="ee3b99fe-2184-4e6e-8447-7337ea552599" config-ref="Salesforce_Config" objectType="Patient_Opportunity__c">
+			<scheduling-strategy>
+				<fixed-frequency />
+			</scheduling-strategy>
+		</salesforce:modified-object-listener>
+		<ee:transform doc:name="Transform Message" doc:id="d9721b70-75fe-45a7-aea6-aa0ca238f2c8">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	patient: {
+		id: payload.Patient_ID__c as Number default 0,
+		firstName: payload.First_Name__c default "",
+		lastName: payload.Last_Name__c default "",
+		email: payload.Email__c default "",
+		dateOfBirth: payload.Date_of_Birth__c as String default "",
+		streetAddress: payload.Street_Address__c default "",
+		city: payload.City__c default "",
+		state: payload.State__c default "",
+		zipCode: payload.Zip_Code__c default "",
+		phone: payload.Mobile_Phone__c default "",
+		postalCode: payload.Zip_Code__c default ""
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<db:update doc:name="Update Patient Demographics Information" doc:id="bfc17f2f-8926-4a52-920f-6e6f10e3bcde" config-ref="Database_Config">
+			<db:sql><![CDATA[UPDATE patients
+SET 
+    first_name = :firstName,
+    last_name = :lastName,
+    email = :email,
+    birthdate = :dateOfBirth,
+    address = :streetAddress,
+    city = :city,
+    state = :state,
+    phone = :phone,
+    postal_code = :postalCode
+WHERE 
+    id = :id;
+]]></db:sql>
+			<db:input-parameters><![CDATA[#[payload.patient]]]></db:input-parameters>
+		</db:update>
+	</flow>
+	
+	
+</mule>
